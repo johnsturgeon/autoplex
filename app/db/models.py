@@ -26,6 +26,7 @@ class PlexTrack(SQLModel, table=True):
     album: str
     duration: int
     audio_codec: str
+    bitrate_kbps: int
     added_at: datetime
     play_count: int
     filepath: str
@@ -44,6 +45,7 @@ class PlexTrack(SQLModel, table=True):
             "album": track.parentTitle,
             "duration": track.duration,
             "audio_codec": track.media[0].audioCodec,
+            "bitrate_kbps": track.media[0].bitrate,
             "added_at": track.addedAt,
             "play_count": int(track.viewCount),
             "library_id": library_id,
