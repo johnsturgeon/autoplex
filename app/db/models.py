@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import Dict, List, Optional
 
+from dateutil import parser
 from plexapi import exceptions
 from plexapi.audio import Track
 from plexapi.library import MusicSection
@@ -146,6 +147,22 @@ class PlexUser(SQLModel, table=True):
                     )
         return None
 
+    @computed_field
+    @property
+    def library_sync_date(self) -> Optional[datetime]:
+        for preference in self.preferences:
+            if preference.key == "library_sync_date" and preference.value:
+                return parser.parse(preference.value)
+        return None
+
+    @computed_field
+    @property
+    def track_sync_date(self) -> Optional[datetime]:
+        for preference in self.preferences:
+            if preference.key == "track_sync_date" and preference.value:
+                return parser.parse(preference.value)
+        return None
+
     # -- public methods --
     def set_server(self, session: Session, value):
         """
@@ -156,6 +173,12 @@ class PlexUser(SQLModel, table=True):
 
     def set_music_library(self, session: Session, value: Optional[str] = None):
         self._set_preference(session, "music_library", value)
+
+    def set_library_sync_date(self, session: Session, value: Optional[str] = None):
+        self._set_preference(session, "library_sync_date", value)
+
+    def set_track_sync_date(self, session: Session, value: Optional[str] = None):
+        self._set_preference(session, "track_sync_date", value)
 
     def sync_libraries_with_db(self, session):
         # First delete all records from `plexserver` and `plexlibrary`
@@ -176,9 +199,8 @@ class PlexUser(SQLModel, table=True):
             )
             try:
                 plex = server.connect()
-            except exceptions.NotFound as e:
+            except exceptions.NotFound as _:
                 # add some logging here
-                print(e)
                 continue
             session.add(plex_server)
 
@@ -193,6 +215,7 @@ class PlexUser(SQLModel, table=True):
                     )
                     session.add(library)
         session.commit()
+        self.set_library_sync_date(session, str(datetime.now(UTC)))
 
     def sync_tracks_with_db(self, session):
         statement = delete(PlexTrack)
@@ -208,6 +231,7 @@ class PlexUser(SQLModel, table=True):
             )
             session.add(plex_track)
         session.commit()
+        self.set_track_sync_date(session, str(datetime.now(UTC)))
 
 
 async def upsert_plex_user(session: Session, auth_token: str):
