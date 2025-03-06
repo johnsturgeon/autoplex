@@ -29,7 +29,7 @@ config = Config.get_config()
 app = FastAPI()
 # noinspection PyTypeChecker
 app.add_middleware(
-    SessionMiddleware, secret_key=config.SESSION_SECRET_KEY, max_age=3600
+    SessionMiddleware, secret_key=config.SESSION_SECRET_KEY, max_age=36000
 )
 
 
@@ -70,26 +70,6 @@ async def verify_plex_user(request: Request) -> str:
     )
 
 
-async def verify_library_db_synced(request: Request):
-    if not request.session.get("db_is_synced"):
-        user_uuid: Optional[str] = request.session.get("user_uuid")
-        if user_uuid:
-            with Session(engine) as session:
-                plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
-                plex_user.sync_libraries_with_db(session)
-                request.session["db_is_synced"] = True
-
-
-async def verify_tracks_db_synced(request: Request):
-    if not request.session.get("tracks_are_synced"):
-        user_uuid: Optional[str] = request.session.get("user_uuid")
-        if user_uuid:
-            with Session(engine) as session:
-                plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
-                plex_user.sync_tracks_with_db(session)
-                request.session["tracks_are_synced"] = True
-
-
 @app.get("/")
 async def root(
     request: Request,
@@ -122,8 +102,6 @@ async def duplicates(
     request: Request,
     user_uuid: Optional[str] = Depends(verify_plex_user),
     session: Session = Depends(get_session),
-    _=Depends(verify_library_db_synced),
-    __=Depends(verify_tracks_db_synced),
 ):
     """
     Render the home page for authenticated Plex users.
@@ -169,7 +147,6 @@ async def preferences(
     request: Request,
     user_uuid: Optional[str] = Depends(verify_plex_user),
     session: Session = Depends(get_session),
-    _=Depends(verify_library_db_synced),
 ):
     """
     Renders the user's account page
@@ -212,7 +189,6 @@ async def save_preferences(
     data: Annotated[PreferenceFormData, Form()],
     user_uuid: Optional[str] = Depends(verify_plex_user),
     session: Session = Depends(get_session),
-    _=Depends(verify_library_db_synced),
 ):
     plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
     if data.server_id:
@@ -222,6 +198,26 @@ async def save_preferences(
     redirect_url = request.url_for("preferences")
     response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
     return response
+
+
+@app.get("/sync")
+async def sync(
+    request: Request,
+    user_uuid: Optional[str] = Depends(verify_plex_user),
+    session: Session = Depends(get_session),
+):
+    plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
+    plex_user.sync_libraries_with_db(session)
+    plex_user.sync_tracks_with_db(session)
+
+    return templates.TemplateResponse(
+        "sync.j2",
+        {
+            "request": request,
+            "plex_user": plex_user,
+            "config": config,
+        },
+    )
 
 
 if __name__ == "__main__":
