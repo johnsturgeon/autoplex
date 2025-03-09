@@ -1,7 +1,9 @@
-from typing import Optional, List, Annotated, Dict
+from typing import Optional, List, Annotated, Dict, Final
 
 import uvicorn
+from celery import Celery
 from fastapi import FastAPI, Request, HTTPException, Depends, Form
+from celery.result import AsyncResult
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import Session, select
@@ -9,7 +11,6 @@ from starlette import status
 from starlette.responses import RedirectResponse
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-
 from app.db.database import create_db_and_tables, engine
 from app.db.models import (
     PlexUser,
@@ -21,29 +22,53 @@ from app.db.models import (
 from app.routers import auth
 from app.config import Config
 
-# Constants used for Plex API configuration and cookie settings.
-
 config = Config.get_config()
-
-# Initialize the FastAPI app and add session middleware.
 app = FastAPI()
 # noinspection PyTypeChecker
 app.add_middleware(
     SessionMiddleware, secret_key=config.SESSION_SECRET_KEY, max_age=36000
 )
-
-
 create_db_and_tables()
-
 app.include_router(auth.router)
-
-# Initialize the Jinja2 templates directory.
 templates = Jinja2Templates(directory="templates")
+
+REDIS_URL: Final = f"redis://{config.REDIS_HOST}:6379"
+celery_app = Celery(
+    __name__,
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    broker_connection_retry_on_startup=True,
+)
+
+
+class TaskOut(BaseModel):
+    id: str
+    status: str
+
+
+# @app.get("/task_status")
+# def task_status(task_id: str) -> TaskOut:
+#     r = db_tasks.celery_app.AsyncResult(task_id)
+#     return _to_task_out(r)
+#
+#
+def _to_task_out(r: AsyncResult) -> TaskOut:
+    return TaskOut(id=r.task_id, status=str(r.status))
 
 
 def get_session():
     with Session(engine) as session:
         yield session
+
+
+@celery_app.task
+def sync_servers_for_user_uuid(user_uuid: str):
+    print("Syncing servers for user uuid", user_uuid)
+    with Session(engine) as session:
+        plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
+        plex_user.sync_servers_with_db(session)
+        session.commit()
+    print("Done syncing servers for user uuid", user_uuid)
 
 
 async def verify_plex_user(request: Request) -> str:
@@ -112,21 +137,20 @@ async def duplicates(
         request (Request): The incoming HTTP request.
         user_uuid (Optional[str]): The UUID of the authenticated user.
         session (Optional[Session]): The current session object.
-        _: verify that the database has been synced with the Plex server.
-        __: Verify that the library tracks have been synced to the DB.
 
     Returns:
         TemplateResponse: The rendered home page.
     """
     plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
     statement = (
-        select(PlexTrack)
+        select(PlexTrack.hash_value)
+        .where(PlexTrack.library_id == plex_user.preferred_music_library.uuid)
         .group_by(PlexTrack.hash_value)
         .having(func.count(PlexTrack.hash_value) > 1)
     )
     dupe_set: Dict[str, List] = {}
-    for track in session.exec(statement):
-        dupe_query = select(PlexTrack).where(PlexTrack.hash_value == track.hash_value)
+    for hash_value in session.exec(statement):
+        dupe_query = select(PlexTrack).where(PlexTrack.hash_value == hash_value)
         for dupe in session.exec(dupe_query):
             if dupe.hash_value not in dupe_set:
                 dupe_set[dupe.hash_value] = []
@@ -183,6 +207,7 @@ class PreferenceFormData(BaseModel):
     music_library_id: Optional[str] = None
 
 
+# noinspection Pydantic, PyTypeChecker
 @app.post("/preferences/save")
 async def save_preferences(
     request: Request,
@@ -195,26 +220,24 @@ async def save_preferences(
         plex_user.set_server(session, data.server_id)
     if data.music_library_id:
         plex_user.set_music_library(session, data.music_library_id)
+
     redirect_url = request.url_for("preferences")
     response = RedirectResponse(url=redirect_url, status_code=status.HTTP_302_FOUND)
     return response
 
 
+# noinspection PyTypeChecker,Pydantic
 @app.get("/sync")
 async def sync(
     request: Request,
     user_uuid: Optional[str] = Depends(verify_plex_user),
-    session: Session = Depends(get_session),
 ):
-    plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
-    plex_user.sync_libraries_with_db(session)
-    plex_user.sync_tracks_with_db(session)
+    sync_servers_for_user_uuid.delay(user_uuid)
 
     return templates.TemplateResponse(
         "sync.j2",
         {
             "request": request,
-            "plex_user": plex_user,
             "config": config,
         },
     )

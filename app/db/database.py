@@ -1,12 +1,14 @@
 from sqlalchemy import create_engine, Engine
 from sqlmodel import SQLModel
 
+from app.config import Config
+
+config = Config.get_config()
+
 
 def get_engine() -> Engine:
-    sqlite_file_name = "db/database.db"
-    sqlite_url = f"sqlite:///{sqlite_file_name}"
-    connect_args = {"check_same_thread": False}
-    return create_engine(sqlite_url, connect_args=connect_args)
+    sql_db_url = f"postgresql+psycopg2://{config.POSTGRESQL_USERNAME}:{config.POSTGRESQL_PASSWORD}@{config.POSTGRESQL_HOST}/autoplex"
+    return create_engine(sql_db_url)
 
 
 engine: Engine = get_engine()

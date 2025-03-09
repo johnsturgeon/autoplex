@@ -113,33 +113,46 @@ def get_auth_url_from_pin_info(pin_code: str, pin_id: str) -> str:
 
 
 def get_server_list_from_plex(auth_token) -> List[MyPlexResource]:
-    account = MyPlexAccount(token=auth_token)
-    resources = account.resources()
-    servers: List[MyPlexResource] = []
-    for resource in resources:
-        if resource.provides == "server" and resource.owned:
-            servers.append(resource)
+    try:
+        account = MyPlexAccount(token=auth_token)
+        print("getting resources")
+        resources = account.resources()
+        servers: List[MyPlexResource] = []
+        for resource in resources:
+            if resource.provides == "server" and resource.owned:
+                servers.append(resource)
+    except Exception as e:
+        print(e)
+        return []
     return servers
 
 
 def get_library_list_from_plex(auth_token: str, server_id: str) -> List[MusicSection]:
-    account = MyPlexAccount(token=auth_token)
-    server = account.resource(server_id)
-    libraries: List[MusicSection] = []
-    plex = server.connect()
-    for section in plex.library.sections():
-        libraries.append(section)
+    try:
+        account = MyPlexAccount(token=auth_token)
+        server = account.resource(server_id)
+        libraries: List[MusicSection] = []
+        plex = server.connect()
+        for section in plex.library.sections():
+            libraries.append(section)
+    except Exception as e:
+        print(e)
+        return []
     return libraries
 
 
 def get_track_list_from_plex_library(
     auth_token: str, server_id: str, library_id: int
 ) -> List[Track]:
-    account = MyPlexAccount(token=auth_token)
-    server = account.resource(server_id)
-    plex = server.connect()
-    library = plex.library.sectionByID(library_id)
-    all_tracks = library.searchTracks()
+    try:
+        account = MyPlexAccount(token=auth_token)
+        server = account.resource(server_id)
+        plex = server.connect()
+        library = plex.library.sectionByID(library_id)
+        all_tracks = library.searchTracks()
+    except Exception as e:
+        print(e)
+        return []
     return all_tracks
 
 

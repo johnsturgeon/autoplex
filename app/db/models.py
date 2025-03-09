@@ -13,6 +13,7 @@ from app.plex.api import (
     get_server_list_from_plex,
     get_plex_user_data_from_plex,
     get_track_list_from_plex_library,
+    get_library_list_from_plex,
 )
 
 
@@ -31,7 +32,9 @@ class PlexTrack(SQLModel, table=True):
     added_at: datetime
     play_count: int
     filepath: str
-    library_id: str = Field(index=True, foreign_key="plexlibrary.uuid")
+    library_id: str = Field(
+        index=True, foreign_key="plexlibrary.uuid", ondelete="CASCADE"
+    )
     library: "PlexLibrary" = Relationship(back_populates="tracks")
     hash_value: str
 
@@ -67,9 +70,13 @@ class PlexLibrary(SQLModel, table=True):
     uuid: str = Field(primary_key=True)
     section_id: int
     title: str
-    server_id: str = Field(index=True, foreign_key="plexserver.uuid")
+    server_id: str = Field(
+        index=True, foreign_key="plexserver.uuid", ondelete="CASCADE"
+    )
     server: "PlexServer" = Relationship(back_populates="libraries")
-    tracks: List[PlexTrack] = Relationship(back_populates="library")
+    tracks: List[PlexTrack] = Relationship(
+        back_populates="library", cascade_delete=True
+    )
 
 
 class PlexServer(SQLModel, table=True):
@@ -77,29 +84,36 @@ class PlexServer(SQLModel, table=True):
 
     uuid: str = Field(primary_key=True)
     name: str
-    user_id: str = Field(index=True, foreign_key="plexuser.uuid")
+    user_id: str = Field(index=True, foreign_key="plexuser.uuid", ondelete="CASCADE")
     user: "PlexUser" = Relationship(back_populates="servers")
-    libraries: List[PlexLibrary] = Relationship(back_populates="server")
+    libraries: List[PlexLibrary] = Relationship(
+        back_populates="server", cascade_delete=True
+    )
 
 
 class Preference(SQLModel, table=True):
     """Class representing a preference"""
 
-    user_id: str = Field(index=True, primary_key=True, foreign_key="plexuser.uuid")
+    user_id: str = Field(
+        index=True, primary_key=True, foreign_key="plexuser.uuid", ondelete="CASCADE"
+    )
     key: str = Field(primary_key=True)
     value: str | None = Field(default=None, nullable=True)
 
     user: "PlexUser" = Relationship(back_populates="preferences")
 
 
+# noinspection PyTypeChecker,Pydantic
 class PlexUser(SQLModel, table=True):
     """Model representing a Plex user."""
 
     uuid: str = Field(primary_key=True)
     auth_token: str
     name: str
-    servers: List[PlexServer] = Relationship(back_populates="user")
-    preferences: List[Preference] = Relationship(back_populates="user")
+    servers: List[PlexServer] = Relationship(back_populates="user", cascade_delete=True)
+    preferences: List[Preference] = Relationship(
+        back_populates="user", cascade_delete=True
+    )
 
     # -- private methods --
     def _set_preference(self, session: Session, key: str, value: str):
@@ -120,16 +134,22 @@ class PlexUser(SQLModel, table=True):
 
         session.commit()  # Commit changes
 
+    def _set_server_sync_date(self, session: Session, value: Optional[str] = None):
+        self._set_preference(session, "server_sync_date", value)
+
     @computed_field
     @property
     def preferred_server(self) -> Optional[PlexServer]:
         for preference in self.preferences:
             if preference.key == "server":
                 server_pref = preference
-                for server in self.servers:
-                    if server.uuid == server_pref.value:
-                        return server
-                assert False, "The server preference did not match the list of servers"
+                if server_pref.value is not None:
+                    for server in self.servers:
+                        if server.uuid == server_pref.value:
+                            return server
+                    assert False, (
+                        "The server preference did not match the list of servers"
+                    )
         return None
 
     @computed_field
@@ -137,14 +157,14 @@ class PlexUser(SQLModel, table=True):
     def preferred_music_library(self) -> Optional[PlexLibrary]:
         for preference in self.preferences:
             if preference.key == "music_library" and preference.value:
-                library_pref = preference
-                if self.preferred_server:
-                    for library in self.preferred_server.libraries:
-                        if library.uuid == library_pref.value:
-                            return library
-                    assert False, (
-                        "The library preference did not match the list of libraries"
-                    )
+                if preference.value is not None:
+                    if self.preferred_server:
+                        for library in self.preferred_server.libraries:
+                            if library.uuid == preference.value:
+                                return library
+                        assert False, (
+                            "The library preference did not match the list of libraries"
+                        )
         return None
 
     @computed_field
@@ -164,7 +184,7 @@ class PlexUser(SQLModel, table=True):
         return None
 
     # -- public methods --
-    def set_server(self, session: Session, value):
+    def set_server(self, session: Session, value: Optional[str] = None):
         """
         Clears the 'library' preference and sets the new server preference.
         """
@@ -174,64 +194,50 @@ class PlexUser(SQLModel, table=True):
     def set_music_library(self, session: Session, value: Optional[str] = None):
         self._set_preference(session, "music_library", value)
 
-    def set_library_sync_date(self, session: Session, value: Optional[str] = None):
-        self._set_preference(session, "library_sync_date", value)
-
-    def set_track_sync_date(self, session: Session, value: Optional[str] = None):
-        self._set_preference(session, "track_sync_date", value)
-
-    def sync_libraries_with_db(self, session):
-        # First delete all records from `plexserver` and `plexlibrary`
-        # Check if the user already exists
-        statement = delete(PlexServer)
-        # noinspection PyTypeChecker
+    def sync_servers_with_db(self, session):
+        statement = delete(PlexServer).where(PlexServer.user_id == self.uuid)
         session.exec(statement)
         session.commit()
-        statement = delete(PlexLibrary)
-        # noinspection PyTypeChecker
-        session.exec(statement)
-        session.commit()
+        self.set_server(session)
         for server in get_server_list_from_plex(self.auth_token):
+            print("Adding server", server.name)
             plex_server: PlexServer = PlexServer(
                 user_id=self.uuid,
                 uuid=server.clientIdentifier,
                 name=server.name,
             )
             try:
-                plex = server.connect()
+                server.connect()
             except exceptions.NotFound as _:
-                # add some logging here
+                print("Could not connect to server", server)
                 continue
             session.add(plex_server)
+            self._sync_libraries_with_db(session, plex_server)
 
-            library: MusicSection
-            for library in plex.library.sections():
-                if library.type == "artist":
-                    library: PlexLibrary = PlexLibrary(
-                        server_id=plex_server.uuid,
-                        section_id=library.key,
-                        uuid=library.uuid,
-                        title=library.title,
-                    )
-                    session.add(library)
-        session.commit()
-        self.set_library_sync_date(session, str(datetime.now(UTC)))
+    def _sync_libraries_with_db(self, session, server: PlexServer):
+        library: MusicSection
+        for library in get_library_list_from_plex(self.auth_token, server.uuid):
+            if library.type == "artist":
+                print("Adding library", library.title)
+                library: PlexLibrary = PlexLibrary(
+                    server_id=server.uuid,
+                    section_id=library.key,
+                    uuid=library.uuid,
+                    title=library.title,
+                )
+                session.add(library)
+                self._sync_tracks_with_db(session, library)
+        self._set_server_sync_date(session, str(datetime.now(UTC)))
 
-    def sync_tracks_with_db(self, session):
-        statement = delete(PlexTrack)
-        session.exec(statement)
-        session.commit()
+    def _sync_tracks_with_db(self, session, library: PlexLibrary):
         for track in get_track_list_from_plex_library(
             self.auth_token,
-            self.preferred_music_library.server_id,
-            self.preferred_music_library.section_id,
+            library.server_id,
+            library.section_id,
         ):
-            plex_track: PlexTrack = PlexTrack.plex_track_from_track(
-                track, self.preferred_music_library.uuid
-            )
+            print("Adding track", track.title)
+            plex_track: PlexTrack = PlexTrack.plex_track_from_track(track, library.uuid)
             session.add(plex_track)
-        session.commit()
-        self.set_track_sync_date(session, str(datetime.now(UTC)))
 
 
 async def upsert_plex_user(session: Session, auth_token: str):

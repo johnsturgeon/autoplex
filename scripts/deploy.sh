@@ -6,7 +6,6 @@
 
 # CHANGE THIS if you want to install in a different directory
 INSTALL_DIR=/opt/autoplex
-DB_FILE="${INSTALL_DIR}/app/db/database.db"
 
 # CHANGE THIS to anything other than 'y' if
 #    you do not want to use infisical for your secret manangement
@@ -36,6 +35,13 @@ then
   apt install python3.11 python3.11-venv python3-pip python-is-python3 -y
 fi
 
+# install postgresql if it's not installed
+if ! dpkge -s postgresql postgresql-contrib > /dev/null 2>&1
+then
+  echo "Installing PostgreSQL"
+  apt install -y postgresql postgresql-contrib
+fi
+
 if ! which uv
 then
   curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -43,6 +49,7 @@ then
 else
   uv self update
 fi
+
 
 echo "Fetching / installing web site from github"
 # fetch the tgfp code
