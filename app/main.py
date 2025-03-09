@@ -19,6 +19,7 @@ from app.db.models import (
     query_user_by_uuid,
     PlexTrack,
 )
+from app.jinja_template_utils import humanize_timedelta
 from app.routers import auth
 from app.config import Config
 
@@ -31,6 +32,7 @@ app.add_middleware(
 create_db_and_tables()
 app.include_router(auth.router)
 templates = Jinja2Templates(directory="templates")
+templates.env.filters["humanize_timedelta"] = humanize_timedelta
 
 REDIS_URL: Final = f"redis://{config.REDIS_HOST}:6379"
 celery_app = Celery(
@@ -245,7 +247,9 @@ async def save_preferences(
 async def sync(
     request: Request,
     user_uuid: Optional[str] = Depends(verify_plex_user),
+    session: Session = Depends(get_session),
 ):
+    plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
     sync_servers_for_user_uuid.delay(user_uuid)
 
     return templates.TemplateResponse(
@@ -253,6 +257,7 @@ async def sync(
         {
             "request": request,
             "config": config,
+            "plex_user": plex_user,
         },
     )
 

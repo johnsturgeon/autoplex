@@ -169,17 +169,9 @@ class PlexUser(SQLModel, table=True):
 
     @computed_field
     @property
-    def library_sync_date(self) -> Optional[datetime]:
+    def server_sync_date(self) -> Optional[datetime]:
         for preference in self.preferences:
-            if preference.key == "library_sync_date" and preference.value:
-                return parser.parse(preference.value)
-        return None
-
-    @computed_field
-    @property
-    def track_sync_date(self) -> Optional[datetime]:
-        for preference in self.preferences:
-            if preference.key == "track_sync_date" and preference.value:
+            if preference.key == "server_sync_date" and preference.value:
                 return parser.parse(preference.value)
         return None
 

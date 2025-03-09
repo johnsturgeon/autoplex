@@ -48,11 +48,24 @@
         </div>
     </div>
 </nav>
-<div class="collapse" id="ticker-banner">
-    <div class="container-fluid" style="background-color: #fff8dc;">
+{% set sync_date = plex_user.server_sync_date %}
+{% if not sync_date%}
+    {% set should_show = " show" %}
+    {% set background_color = "#ffdddd" %}
+{% else %}
+    {% set should_show = "" %}
+    {% set background_color = "#fff8dc" %}
+{% endif %}
+<div class="collapse{{ should_show }}" id="ticker-banner">
+    <div class="container-fluid" style="background-color: {{ background_color }};">
         <div class="d-flex justify-content-between align-items-center py-2 px-3">
             <div>
-                Latest update: System is running smoothly.
+                <span class="fw-bold">Last Synced:</span>
+                {% if not sync_date %}
+                    Never
+                {% else %}
+                    {{ sync_date.timestamp() | humanize_timedelta }}
+                {% endif %}
             </div>
             <!-- Changed element from <button> to <a> for navigation -->
             <a href="{{ url_for('sync') }}" class="btn btn-warning">Sync Now</a>
