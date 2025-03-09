@@ -1,9 +1,7 @@
-from datetime import datetime, UTC
-import humanize
+import arrow
 
 
-def humanize_timedelta(
-    start_date_str: str, end_date: datetime = datetime.now(UTC)
-) -> str:
-    start_date: datetime = datetime.fromtimestamp(int(start_date_str), UTC)
-    return humanize.naturaltime(end_date - start_date)
+def humanize_timedelta(start_date_str: str) -> str:
+    start_date = arrow.get(start_date_str)
+    human_time = start_date.humanize()
+    return human_time
