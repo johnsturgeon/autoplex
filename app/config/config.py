@@ -23,7 +23,11 @@ class Config:
     PLEX_AUTH_URL: str
     PLEX_PIN_URL: str
     PLEX_USER_URL: str
+    POSTGRESQL_HOST: str
+    POSTGRESQL_PASSWORD: str
+    POSTGRESQL_USERNAME: str
     PORT: int
+    REDIS_HOST: str
     SESSION_SECRET_KEY: str
     UMAMI_KEY: str
 
@@ -43,7 +47,11 @@ class Config:
             PLEX_AUTH_URL=os.getenv("PLEX_AUTH_URL"),
             PLEX_PIN_URL=os.getenv("PLEX_PIN_URL"),
             PLEX_USER_URL=os.getenv("PLEX_USER_URL"),
+            POSTGRESQL_HOST=os.getenv("POSTGRESQL_HOST"),
+            POSTGRESQL_PASSWORD=os.getenv("POSTGRESQL_PASSWORD"),
+            POSTGRESQL_USERNAME=os.getenv("POSTGRESQL_USERNAME"),
             PORT=int(os.getenv("PORT")),
+            REDIS_HOST=os.getenv("REDIS_HOST"),
             SESSION_SECRET_KEY=os.getenv("SESSION_SECRET_KEY"),
             UMAMI_KEY=os.getenv("UMAMI_KEY"),
         )
