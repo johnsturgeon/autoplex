@@ -3,29 +3,41 @@
 {% block title %}Duplicates{% endblock %}
 
 {% block content %}
-    <h1>Welcome to Autoplex DeDup tool</h1>
-    <div class="container">
-        {% for group_hash, duplicates in dupe_set.items() %}
-            <div class="row mb-4">
-                <div class="col-12">
-                    <h4 class="mb-3">Duplicate: {{ duplicates[0].artist }} - {{ duplicates[0].album }} - {{ duplicates[0].title }}
-                        - {{ (duplicates[0].duration // 60000)|int }}m{{ ((duplicates[0].duration // 1000) % 60)|int }}s</h4>
+    <h3>Welcome to Autoplex DeDup tool</h3>
+    {% if not prefs_set %}
+        <div class="container">
+            <div class="row">
+                <div class="col-lg bg-danger-subtle border rounded text-md-center py-3">
+                    <h5>No Library Preference</h5>
+                    <div>Please go to <a href="{{ url_for('preferences') }}">Preferences</a> to choose your Music Library</div>
                 </div>
-                {% for track in duplicates %}
-                    <div class="col-md-4 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title">{{ track.title }}</h5>
-                                <p class="card-text">
-                                    <strong>Filepath:</strong> {{ track.filepath }}<br>
-                                    <strong>Codec:</strong> {{ track.audio_codec }}<br>
-                                    <strong>bitrate:</strong> {{ track.bitrate_kbps }}kb/s
-                                </p>
+            </div>
+        </div>
+    {% else %}
+        <div class="container">
+            {% for group_hash, duplicates in dupe_set.items() %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <h4 class="mb-3">Duplicate: {{ duplicates[0].artist }} - {{ duplicates[0].album }}
+                            - {{ duplicates[0].title }}
+                            - {{ (duplicates[0].duration // 60000)|int }}m{{ ((duplicates[0].duration // 1000) % 60)|int }}s</h4>
+                    </div>
+                    {% for track in duplicates %}
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ track.title }}</h5>
+                                    <p class="card-text">
+                                        <strong>Filepath:</strong> {{ track.filepath }}<br>
+                                        <strong>Codec:</strong> {{ track.audio_codec }}<br>
+                                        <strong>bitrate:</strong> {{ track.bitrate_kbps }}kb/s
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endfor %}
-    </div>
+                    {% endfor %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
 {% endblock %}

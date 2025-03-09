@@ -95,6 +95,16 @@ async def verify_plex_user(request: Request) -> str:
     )
 
 
+async def verify_library_pref_set(request: Request) -> bool:
+    user_uuid: Optional[str] = request.session.get("user_uuid")
+    if user_uuid:
+        with Session(engine) as session:
+            plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
+            if plex_user.preferred_music_library:
+                return True
+    return False
+
+
 @app.get("/")
 async def root(
     request: Request,
@@ -127,6 +137,7 @@ async def duplicates(
     request: Request,
     user_uuid: Optional[str] = Depends(verify_plex_user),
     session: Session = Depends(get_session),
+    prefs_set: bool = Depends(verify_library_pref_set),
 ):
     """
     Render the home page for authenticated Plex users.
@@ -137,31 +148,34 @@ async def duplicates(
         request (Request): The incoming HTTP request.
         user_uuid (Optional[str]): The UUID of the authenticated user.
         session (Optional[Session]): The current session object.
+        prefs_set (Optional[bool]): Whether the Plex user preferences are set or not.
 
     Returns:
         TemplateResponse: The rendered home page.
     """
     plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
-    statement = (
-        select(PlexTrack.hash_value)
-        .where(PlexTrack.library_id == plex_user.preferred_music_library.uuid)
-        .group_by(PlexTrack.hash_value)
-        .having(func.count(PlexTrack.hash_value) > 1)
-    )
     dupe_set: Dict[str, List] = {}
-    for hash_value in session.exec(statement):
-        dupe_query = select(PlexTrack).where(PlexTrack.hash_value == hash_value)
-        for dupe in session.exec(dupe_query):
-            if dupe.hash_value not in dupe_set:
-                dupe_set[dupe.hash_value] = []
-            dupe_set[dupe.hash_value].append(dupe)
+    if prefs_set:
+        statement = (
+            select(PlexTrack.hash_value)
+            .where(PlexTrack.library_id == plex_user.preferred_music_library.uuid)
+            .group_by(PlexTrack.hash_value)
+            .having(func.count(PlexTrack.hash_value) > 1)
+        )
+        for hash_value in session.exec(statement):
+            dupe_query = select(PlexTrack).where(PlexTrack.hash_value == hash_value)
+            for dupe in session.exec(dupe_query):
+                if dupe.hash_value not in dupe_set:
+                    dupe_set[dupe.hash_value] = []
+                dupe_set[dupe.hash_value].append(dupe)
     return templates.TemplateResponse(
         "duplicates.j2",
         {
             "request": request,
-            "plex_user": plex_user,
             "config": config,
+            "plex_user": plex_user,
             "dupe_set": dupe_set,
+            "prefs_set": prefs_set,
         },
     )
 
