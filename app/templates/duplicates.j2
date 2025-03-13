@@ -7,37 +7,47 @@
     {% if not prefs_set %}
         <div class="container">
             <div class="row">
-                <div class="col-lg bg-danger-subtle border rounded text-md-center py-3">
+                <div class="col-lg bg-danger-subtle border rounded-2 text-md-center">
                     <h5>No Library Preference</h5>
-                    <div>Please go to <a href="{{ url_for('preferences') }}">Preferences</a> to choose your Music Library</div>
+                    <div>Please go to <a href="{{ url_for('preferences') }}">Preferences</a> to choose your Music
+                        Library
+                    </div>
                 </div>
             </div>
         </div>
     {% else %}
-        <div class="container">
-            {% for group_hash, duplicates in dupe_set.items() %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <h4 class="mb-3">Duplicate: {{ duplicates[0].artist }} - {{ duplicates[0].album }}
-                            - {{ duplicates[0].title }}
-                            - {{ (duplicates[0].duration // 60000)|int }}m{{ ((duplicates[0].duration // 1000) % 60)|int }}s</h4>
+        {% set dupe_count = dupe_set.items() | length %}
+        {% for group_hash, duplicates in dupe_set.items() %}
+            {% set track_count = duplicates | length %}
+            <div class="container rounded-3 border border-black my-2 shadow-sm">
+                <div class="row row-cols-auto rounded-top-3 border-black border-bottom"
+                     style="background-color: #cccccc">
+                    <div class="col align-middle text-nowrap bg-black text-white border-tl rounded-top-2 rounded-end-0"
+                         style="font-size: 0.8em">{{ loop.index }}
+                        / {{ dupe_count }}</div>
+                    <div class="col"><i class="bi-music-note"> </i>{{ duplicates[0].title }}</div>
+                    <div class="col fst-italic"><i class="bi-person-circle"> </i>{{ duplicates[0].artist }}</div>
+                    <div class="col"><i class="bi-vinyl-fill"> </i> {{ duplicates[0].album }}</div>
+                    <div class="col"><i
+                            class="bi-stopwatch"> </i> {{ (duplicates[0].duration // 60000)|int }}m{{ ((duplicates[0].duration // 1000) % 60)|int }}s
                     </div>
-                    {% for track in duplicates %}
-                        <div class="col-md-4 mb-3">
-                            <div class="card h-100">
-                                <div class="card-body">
-                                    <h5 class="card-title">{{ track.title }}</h5>
-                                    <p class="card-text">
-                                        <strong>Filepath:</strong> {{ track.filepath }}<br>
-                                        <strong>Codec:</strong> {{ track.audio_codec }}<br>
-                                        <strong>bitrate:</strong> {{ track.bitrate_kbps }}kb/s
-                                    </p>
-                                </div>
+                </div>
+                {% for track in duplicates %}
+                    <div class="row border rounded-3 m-1 my-3 p-1 shadow">
+                        <div class="col-1 align-content-center text-center border-end"><i class="bi-flag"></i></div>
+                        <div class="col-11">
+                            <div class="row border-bottom p-1">
+                                <div class="col font-monospace">{{ track.filepath }}</div>
+                            </div>
+                            <div class="row p-1 row-cols-auto">
+                                <div class="col"><strong>Added: </strong>{{ track.added_at }}</div>
+                                <div class="col"><strong>Plays: </strong>{{ track.play_count }}</div>
+                                <div class="col"><strong>Codec: </strong>{{ track.audio_codec | upper }} / {{ track.bitrate_kbps }}kbps</div>
                             </div>
                         </div>
-                    {% endfor %}
-                </div>
-            {% endfor %}
-        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
     {% endif %}
 {% endblock %}

@@ -137,6 +137,9 @@ class PlexUser(SQLModel, table=True):
     def _set_server_sync_date(self, session: Session, value: Optional[str] = None):
         self._set_preference(session, "server_sync_date", value)
 
+    def _set_server_sync_status(self, session: Session, value: Optional[str] = None):
+        self._set_preference(session, "server_sync_status", value)
+
     @computed_field
     @property
     def preferred_server(self) -> Optional[PlexServer]:
@@ -175,6 +178,14 @@ class PlexUser(SQLModel, table=True):
                 return parser.parse(preference.value)
         return None
 
+    @computed_field
+    @property
+    def server_sync_status(self) -> Optional[str]:
+        for preference in self.preferences:
+            if preference.key == "server_sync_status" and preference.value:
+                return preference.value
+        return None
+
     # -- public methods --
     def set_server(self, session: Session, value: Optional[str] = None):
         """
@@ -190,9 +201,8 @@ class PlexUser(SQLModel, table=True):
         statement = delete(PlexServer).where(PlexServer.user_id == self.uuid)
         session.exec(statement)
         session.commit()
-        self.set_server(session)
+        self._set_server_sync_status(session, "Sync Started")
         for server in get_server_list_from_plex(self.auth_token):
-            print("Adding server", server.name)
             plex_server: PlexServer = PlexServer(
                 user_id=self.uuid,
                 uuid=server.clientIdentifier,
@@ -203,43 +213,53 @@ class PlexUser(SQLModel, table=True):
             except exceptions.NotFound as _:
                 print("Could not connect to server", server)
                 continue
+            self._set_server_sync_status(session, f"Adding Server: {plex_server.name}")
             session.add(plex_server)
             self._sync_libraries_with_db(session, plex_server)
+        self._set_server_sync_status(session, "Sync Completed")
 
     def _sync_libraries_with_db(self, session, server: PlexServer):
         library: MusicSection
         for library in get_library_list_from_plex(self.auth_token, server.uuid):
             if library.type == "artist":
-                print("Adding library", library.title)
-                library: PlexLibrary = PlexLibrary(
+                plex_library: PlexLibrary = PlexLibrary(
                     server_id=server.uuid,
                     section_id=library.key,
                     uuid=library.uuid,
                     title=library.title,
                 )
-                session.add(library)
-                self._sync_tracks_with_db(session, library)
+                self._set_server_sync_status(
+                    session, f"{server.name} - Adding Library: {plex_library.title}"
+                )
+
+                session.add(plex_library)
+                total_tracks: int = library.totalViewSize(libtype="track")
+                self._sync_tracks_with_db(session, plex_library, total_tracks)
         self._set_server_sync_date(session, str(datetime.now(UTC)))
 
-    def _sync_tracks_with_db(self, session, library: PlexLibrary):
+    def _sync_tracks_with_db(self, session, library: PlexLibrary, total_tracks: int):
+        current_track: int = 1
         for track in get_track_list_from_plex_library(
             self.auth_token,
             library.server_id,
             library.section_id,
         ):
-            print("Adding track", track.title)
             plex_track: PlexTrack = PlexTrack.plex_track_from_track(track, library.uuid)
+            self._set_server_sync_status(
+                session,
+                f"{library.title} - Adding Track ({current_track}/{total_tracks}): {track.title}",
+            )
             session.add(plex_track)
+            current_track += 1
 
 
+# noinspection Pydantic, PyTypeChecker
 async def upsert_plex_user(session: Session, auth_token: str):
     """Updates the user, or inserts if none exists"""
     plex_user: PlexUser = await get_plex_user_from_auth_token(auth_token)
     user_uuid: str = plex_user.uuid
     # Check if the user already exists
-    # noinspection Pydantic
     statement = select(PlexUser).where(PlexUser.uuid == user_uuid)
-    # noinspection PyTypeChecker
     existing_user = session.exec(statement).first()
     if existing_user:
         # Update existing user
@@ -248,7 +268,7 @@ async def upsert_plex_user(session: Session, auth_token: str):
     else:
         # Insert new user
         session.add(plex_user)
-    session.commit()  # Commit changes
+    session.commit()
     return plex_user
 
 
