@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!--suppress JSUnresolvedReference -->
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -10,6 +11,9 @@
             href=https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css
             rel="stylesheet"
     >
+    <link href="{{ url_for('static', path='/bootstrap.css') }}" rel="stylesheet">
+    <!-- Option 1: Include in HTML -->
+    <link rel="stylesheet" href=https://cdn.jsdelivr.net/npm/bootstrap-icons@1.3.0/font/bootstrap-icons.css>
     <script defer src="https://umami.sturgeon.me/script.js" data-website-id="{{ config.UMAMI_KEY }}"></script>
 </head>
 <body>
@@ -49,7 +53,7 @@
     </div>
 </nav>
 {% set sync_date = plex_user.server_sync_date %}
-{% if not sync_date%}
+{% if not sync_date %}
     {% set should_show = " show" %}
     {% set background_color = "#ffdddd" %}
 {% else %}
@@ -61,14 +65,10 @@
         <div class="d-flex justify-content-between align-items-center py-2 px-3">
             <div>
                 <span class="fw-bold">Last Synced:</span>
-                {% if not sync_date %}
-                    Never
-                {% else %}
-                    {{ sync_date.timestamp() | humanize_timedelta }}
-                {% endif %}
-            </div>
-            <!-- Changed element from <button> to <a> for navigation -->
-            <a href="{{ url_for('sync') }}" class="btn btn-warning">Sync Now</a>
+                <span id="sync-status-text">
+                </span>
+            </div>            <!-- Changed element from <button> to <a> for navigation -->
+            <a href="{{ url_for('sync') }}" id="sync-now-btn" class="btn btn-warning">Sync Now</a>
         </div>
     </div>
 </div>
@@ -86,5 +86,65 @@
         src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js">
 </script>
 
+<script>
+    let slowPollingInterval = 60000; // 1 minute
+    let fastPollingInterval = 250;   // 250 ms
+    let pollingIntervalId;
+    let isFastPolling = false;
+
+    // Function to start polling with a given interval.
+    function startPolling(interval) {
+        if (pollingIntervalId) {
+            clearInterval(pollingIntervalId);
+        }
+        pollingIntervalId = setInterval(updateSyncStatus, interval);
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        let syncButton = document.getElementById("sync-now-btn");
+        syncButton.addEventListener("click", function (e) {
+            e.preventDefault();
+            if (!isFastPolling) {
+                console.log("Setting poling interval to fast")
+                isFastPolling = true;
+                startPolling(fastPollingInterval);
+            }
+            fetch("{{ url_for('sync') }}", {method: "GET"})
+                .then(response => response.json())
+                .then(data => {
+                    console.log("Sync complete", data);
+                    // Optionally, update the UI to reflect the sync result
+                })
+                .catch(error => {
+                    console.error("Error during sync", error);
+                });
+        });
+        updateSyncStatus()
+    });
+
+    function updateSyncStatus() {
+        console.log("Updating sync status")
+        fetch("{{ url_for('sync_status') }}", {method: "GET"})
+            .then(response => response.json())
+            .then(data => {
+                let syncStatusText = document.getElementById("sync-status-text");
+                // If the sync job is running, update the text to 'Running'
+                if (data.sync_status === "Sync Completed") {
+                    syncStatusText.textContent = data.last_synced;
+                    if (isFastPolling) {
+                        console.log("Switching to slow poling")
+                        isFastPolling = false;
+                        startPolling(slowPollingInterval);
+                    }
+                } else {
+                    // Otherwise, update with the last sync time provided by the backend
+                    syncStatusText.textContent = data.sync_status;
+                }
+            })
+            .catch(error => {
+                console.error("Error fetching sync status", error);
+            });
+    }
+</script>
 </body>
 </html>

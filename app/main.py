@@ -1,14 +1,16 @@
 from typing import Optional, List, Annotated, Dict, Final
 
+import arrow
 import uvicorn
 from celery import Celery
 from fastapi import FastAPI, Request, HTTPException, Depends, Form
+from fastapi.staticfiles import StaticFiles
 from celery.result import AsyncResult
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlmodel import Session, select
 from starlette import status
-from starlette.responses import RedirectResponse
+from starlette.responses import RedirectResponse, JSONResponse
 from starlette.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from app.db.database import create_db_and_tables, engine
@@ -25,6 +27,8 @@ from app.config import Config
 
 config = Config.get_config()
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # noinspection PyTypeChecker
 app.add_middleware(
     SessionMiddleware, secret_key=config.SESSION_SECRET_KEY, max_age=36000
@@ -245,21 +249,29 @@ async def save_preferences(
 # noinspection PyTypeChecker,Pydantic
 @app.get("/sync")
 async def sync(
-    request: Request,
+    user_uuid: Optional[str] = Depends(verify_plex_user),
+):
+    sync_servers_for_user_uuid.delay(user_uuid)
+    response = {"status": "success"}
+    return JSONResponse(content=response)
+
+
+@app.get("/sync_status")
+async def sync_status(
     user_uuid: Optional[str] = Depends(verify_plex_user),
     session: Session = Depends(get_session),
 ):
     plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
-    sync_servers_for_user_uuid.delay(user_uuid)
+    server_sync_status: str = plex_user.server_sync_status
+    if plex_user.server_sync_date:
+        # Compute how long ago the sync occurred in a human-friendly format.
+        start_date = arrow.get(plex_user.server_sync_date)
+        last_synced = start_date.humanize()
+    else:
+        last_synced = "Never"
 
-    return templates.TemplateResponse(
-        "sync.j2",
-        {
-            "request": request,
-            "config": config,
-            "plex_user": plex_user,
-        },
-    )
+    response = {"sync_status": server_sync_status, "last_synced": last_synced}
+    return JSONResponse(content=response)
 
 
 if __name__ == "__main__":
