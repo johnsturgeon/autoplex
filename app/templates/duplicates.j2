@@ -89,8 +89,36 @@
                             }
                         }
                     }
-                    console.log(data);
                 })
                 .catch(error => console.error(error));
         }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            let serverSelect = document.getElementById("serverID");
+            if (serverSelect) {
+                serverSelect.addEventListener("change", function() {
+                    let row = this.closest('.row');
+                    if (row) {
+                        let icon = row.querySelector('div.col-sm-1.fs-6 i');
+                        if (icon) {
+                            icon.className = 'bi-loading';
+                        }
+                    }
+                    this.form.submit();
+                });
+            }
+            let librarySelect = document.getElementById("libraryID");
+            if (librarySelect) {
+                librarySelect.addEventListener("change", function() {
+                    let row = this.closest('.row');
+                    if (row) {
+                        let icon = row.querySelector('div.col-sm-1.fs-6 i');
+                        if (icon) {
+                            icon.className = 'bi-loading';
+                        }
+                    }
+                    this.form.submit();
+                });
+            }
+        });
     </script>{% endblock %}

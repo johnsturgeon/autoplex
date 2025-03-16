@@ -45,6 +45,7 @@ async def _get_auth_token_from_pin(pin_id: str, pin_code: str) -> Optional[str]:
 
 
 @router.get("/login")
+@router.post("/login")
 async def login(request: Request) -> JSONResponse:
     """
     Initiate the Plex login process by generating a PIN and redirecting to Plex's authentication page.

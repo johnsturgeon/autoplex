@@ -3,42 +3,81 @@
 {% block title %}Preferences{% endblock %}
 
 {% block content %}
-    <h1>Preferences for {{ plex_user.name }}</h1>
+    <h3>Preferences for {{ plex_user.name }}</h3>
     <form action="{{ url_for('save_preferences') }}" method="POST">
-        <select name="server_id" class="form-select" aria-label="Plex Server Select">
-            {% if not selected_server_id %}
-                <option disabled selected value> -- select a server --</option>
-            {% endif %}
-            {% for server in plex_servers %}
-                {% set selected_text = "" %}
-                {% if server.uuid == selected_server_id %}
-                    {% set selected_text = "selected" %}
-                {% endif %}
-                <option {{ selected_text }} value="{{ server.uuid }}">{{ server.name }}</option>
-            {% endfor %}
-        </select>
-        <button type="submit" class="btn btn-primary">Submit</button>
+        <div class="row mb-3">
+            <label for="serverID" class="col-sm-1 col-form-label fw-bold">Server</label>
+            <div class="col-sm-5">
+                <select id="serverID" name="server_id" class="form-select form-select-sm"
+                        aria-label="Plex Server Select">
+                    {% if not selected_server_id %}
+                        <option disabled selected value> -- select a server --</option>
+                        {% set icon="bi-exclamation-triangle" %}
+                        {% set icon_color="#ffc300" %}
+                    {% else %}
+                        {% set icon="bi-check2-circle" %}
+                        {% set icon_color="green" %}
+
+                    {% endif %}
+                    {% for server in plex_servers %}
+                        {% set selected_text = "" %}
+                        {% if server.uuid == selected_server_id %}
+                            {% set selected_text = "selected" %}
+                        {% endif %}
+                        <option {{ selected_text }} value="{{ server.uuid }}">{{ server.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-1 fs-6"><i class="{{ icon }}" style="color: {{ icon_color }} "></i></div>
+        </div>
     </form>
     {% if selected_server_id %}
         <form action="{{ url_for('save_preferences') }}" method="POST">
-            <select name="music_library_id" class="form-select" aria-label="Plex Music Library Select">
-                {% if not selected_music_library_id %}
-                    <option disabled selected value> -- select a library --</option>
-                {% endif %}
-                {% for music_library in plex_music_libraries %}
-                    {% set selected_text = "" %}
-                    {% if music_library.uuid == selected_music_library_id %}
-                        {% set selected_text = "selected" %}
-                    {% endif %}
-                    <option
-                            {{ selected_text }} value="{{ music_library.uuid }}"
-                    >
-                        {{ music_library.title }}
-                    </option>
-                {% endfor %}
-            </select>
-            <button type="submit" class="btn btn-primary">Submit</button>
+            <div class="row mb-3">
+                <label for="libraryID" class="col-sm-1 col-form-label fw-bold">Library</label>
+                <div class="col-sm-5">
+                    <select id="libraryID" name="music_library_id" class="form-select form-select-sm"
+                            aria-label="Plex Music Library Select">
+                        {% if not selected_music_library_id %}
+                            <option disabled selected value> -- select a library --</option>
+                            {% set icon="bi-exclamation-triangle" %}
+                            {% set icon_color="#ffc300" %}
+                        {% else %}
+                            {% set icon="bi-check2-circle" %}
+                            {% set icon_color="green" %}
+                        {% endif %}
+                        {% for music_library in plex_music_libraries %}
+                            {% set selected_text = "" %}
+                            {% if music_library.uuid == selected_music_library_id %}
+                                {% set selected_text = "selected" %}
+                            {% endif %}
+                            <option
+                                    {{ selected_text }} value="{{ music_library.uuid }}"
+                            >
+                                {{ music_library.title }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-sm-1 fs-6"><i class="{{ icon }}" style="color: {{ icon_color }} "></i></div>
+            </div>
         </form>
     {% endif %}
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            let serverSelect = document.getElementById("serverID");
+            if (serverSelect) {
+                serverSelect.addEventListener("change", function () {
+                    this.form.submit();
+                });
+            }
+            let librarySelect = document.getElementById("libraryID");
+            if (librarySelect) {
+                librarySelect.addEventListener("change", function () {
+                    this.form.submit();
+                });
+            }
+        });
+    </script>
 {% endblock %}
