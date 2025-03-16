@@ -33,8 +33,17 @@
                     </div>
                 </div>
                 {% for track in duplicates %}
-                    <div class="row border rounded-3 m-1 my-3 p-1 shadow">
-                        <div class="col-1 align-content-center text-center border-end"><i class="bi-flag"></i></div>
+                    {% if track.flagged_for_deletion %}
+                        {% set flag_class="bi-flag-fill" %}
+                        {% set opacity=" text-black text-opacity-25" %}
+                    {% else %}
+                        {% set flag_class="bi-flag" %}
+                        {% set opacity="" %}
+                    {% endif %}
+                    <div class="row border rounded-3 m-1 my-3 p-1 shadow {{ opacity }}" id="track-{{ track.rating_key }}">
+                        <div class="col-1 align-content-center text-center border-end"
+                             onclick="toggleSelectTrack({{ track.rating_key }})"><i class="{{ flag_class }}"
+                                                                                    style="color: darkred"></i></div>
                         <div class="col-11">
                             <div class="row border-bottom p-1">
                                 <div class="col font-monospace">{{ track.filepath }}</div>
@@ -42,7 +51,9 @@
                             <div class="row p-1 row-cols-auto">
                                 <div class="col"><strong>Added: </strong>{{ track.added_at }}</div>
                                 <div class="col"><strong>Plays: </strong>{{ track.play_count }}</div>
-                                <div class="col"><strong>Codec: </strong>{{ track.audio_codec | upper }} / {{ track.bitrate_kbps }}kbps</div>
+                                <div class="col"><strong>Codec: </strong>{{ track.audio_codec | upper }}
+                                    / {{ track.bitrate_kbps }}kbps
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -51,3 +62,35 @@
         {% endfor %}
     {% endif %}
 {% endblock %}
+{% block scripts %}
+    <script>
+        function toggleSelectTrack(rating_key) {
+            alert('clicked with rating key: ' + rating_key);
+            // Generate the URL with a placeholder and then replace it with the actual rating_key
+            let url = "{{ url_for('toggle_select_track', rating_key='__rating_key__') }}";
+            url = url.replace('__rating_key__', rating_key);
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        let icon = document.querySelector(`#track-${rating_key} i`);
+                        let parent = document.getElementById(`track-${rating_key}`);
+                        if (data.flag_state) {
+                            icon.classList.remove('bi-flag');
+                            icon.classList.add('bi-flag-fill');
+                            if (parent) {
+                                parent.classList.add('text-black', 'text-opacity-25');
+                            }
+                        } else {
+                            icon.classList.remove('bi-flag-fill');
+                            icon.classList.add('bi-flag');
+                            if (parent) {
+                                parent.classList.remove('text-black', 'text-opacity-25');
+                            }
+                        }
+                    }
+                    console.log(data);
+                })
+                .catch(error => console.error(error));
+        }
+    </script>{% endblock %}
