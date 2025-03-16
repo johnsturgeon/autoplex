@@ -274,6 +274,26 @@ async def sync_status(
     return JSONResponse(content=response)
 
 
+@app.get("/toggle_select_track/{rating_key}", name="toggle_select_track")
+async def toggle_select_track(
+    rating_key: int,
+    user_uuid: Optional[str] = Depends(verify_plex_user),
+    session: Session = Depends(get_session),
+    prefs_set: bool = Depends(verify_library_pref_set),
+):
+    result = {"success": False, "flag_state": False}
+    if prefs_set:
+        plex_user: PlexUser = query_user_by_uuid(session, user_uuid)
+        for track in plex_user.preferred_music_library.tracks:
+            if track.rating_key == rating_key:
+                track.flagged_for_deletion = not track.flagged_for_deletion
+                session.commit()
+                result["success"] = True
+                result["flag_state"] = track.flagged_for_deletion
+                break
+    return JSONResponse(content=result)
+
+
 if __name__ == "__main__":
     """
     Entry point for running the application.
