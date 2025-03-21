@@ -19,15 +19,14 @@ class Config:
     DEV_AUTH_TOKEN: str
     DEV_RESOURCE_ID: str
     ENVIRONMENT: str
-    HOSTNAME: str
     PLEX_AUTH_URL: str
     PLEX_PIN_URL: str
     PLEX_USER_URL: str
     POSTGRESQL_HOST: str
     POSTGRESQL_PASSWORD: str
     POSTGRESQL_USERNAME: str
-    PORT: int
-    REDIS_HOST: str
+    AUTOPLEX_PORT: int
+    REDIS_URL: str
     SESSION_SECRET_KEY: str
     UMAMI_KEY: str
 
@@ -43,15 +42,14 @@ class Config:
             DEV_AUTH_TOKEN=os.getenv("DEV_AUTH_TOKEN"),
             DEV_RESOURCE_ID=os.getenv("DEV_RESOURCE_ID"),
             ENVIRONMENT=os.getenv("ENVIRONMENT"),
-            HOSTNAME=os.getenv("HOSTNAME"),
             PLEX_AUTH_URL=os.getenv("PLEX_AUTH_URL"),
             PLEX_PIN_URL=os.getenv("PLEX_PIN_URL"),
             PLEX_USER_URL=os.getenv("PLEX_USER_URL"),
             POSTGRESQL_HOST=os.getenv("POSTGRESQL_HOST"),
             POSTGRESQL_PASSWORD=os.getenv("POSTGRESQL_PASSWORD"),
             POSTGRESQL_USERNAME=os.getenv("POSTGRESQL_USERNAME"),
-            PORT=int(os.getenv("PORT")),
-            REDIS_HOST=os.getenv("REDIS_HOST"),
+            AUTOPLEX_PORT=int(os.getenv("AUTOPLEX_PORT")),
+            REDIS_URL=os.getenv("REDIS_URL"),
             SESSION_SECRET_KEY=os.getenv("SESSION_SECRET_KEY"),
             UMAMI_KEY=os.getenv("UMAMI_KEY"),
         )

@@ -38,7 +38,7 @@ app.include_router(auth.router)
 templates = Jinja2Templates(directory="templates")
 templates.env.filters["humanize_timedelta"] = humanize_timedelta
 
-REDIS_URL: Final = f"redis://{config.REDIS_HOST}:6379"
+REDIS_URL: Final = config.REDIS_URL
 celery_app = Celery(
     __name__,
     broker=REDIS_URL,
@@ -303,5 +303,9 @@ if __name__ == "__main__":
     """
     reload: bool = config.ENVIRONMENT != "production"
     uvicorn.run(
-        "main:app", host="0.0.0.0", port=config.PORT, reload=reload, access_log=False
+        "main:app",
+        host="0.0.0.0",
+        port=config.AUTOPLEX_PORT,
+        reload=reload,
+        access_log=False,
     )

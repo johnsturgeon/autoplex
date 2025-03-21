@@ -1,12 +1,12 @@
 [Unit]
-Description=AutoPlex Plex Helper
+Description=AutoPlex Celery Worker
 After=network-online.target
 
 [Service]
 WorkingDirectory=/opt/autoplex/app
 Type=simple
 Restart=always
-ExecStart=/opt/autoplex/app/.venv/bin/python main.py
+ExecStart=/opt/autoplex/app/.venv/bin/celery --app=main.celery_app worker --concurrency=1
 
 [Install]
 WantedBy=multi-user.target

@@ -6,21 +6,31 @@ Utilities and scripts for plex using the Plex API to clean up and manage your Pl
 
 ---
 
-## UPDATE 2025-01-29
-
-I'm going to work on making a web server for interacting with the plex tools.  You can follow along the project here:
 [Prioritized backlog · Create a website for the plex-tools](https://github.com/users/johnsturgeon/projects/8)
 
 ## Deployment instructions
 
 ### Linux Installation Notes
 
-* I've installed this on a bare bones Debian 12 LXC (in ProxMox).  
+* I've installed this on a bare bones Debian 12 LXC (in ProxMox).  The script will work for that environment.  I've not tested for any other distribution, testers are welcome!
 
-You can review the script, each step is commented
+### Prerequisites
+* [Infisical](https://infisical.com) for secrets management (optional)
+* Linux OS (Debian 12 tested)
+
+### Installation script: [deploy.sh](scripts/deploy.sh)
+
+1. Download the installation script 
+    ```shell
+    wget -q https://github.com/johnsturgeon/autoplex/raw/main/scripts/deploy.sh
+    chmod +x deploy.sh
+    ```
+2. Edit the deployment script and change the following variables to your situation:
+    * `INSTALL_DIR`
+    * `USE_INFISICAL`
+
+3. Execute the script
+    * NOTE: I installed this as `root`, you can `sudo` if necessary
 ```shell
-bash -c "$(wget -qLO - https://github.com/johnsturgeon/autoplex/raw/main/scripts/deploy.sh)"
+./deploy.sh
 ```
-
-## Scripts
-You can read about the CLI version of `deduplex.py` [here](docs/deduplex.md)
