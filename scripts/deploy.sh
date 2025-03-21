@@ -11,6 +11,10 @@ INSTALL_DIR=/opt/autoplex
 #    you do not want to use infisical for your secret manangement
 USE_INFISICAL=y
 
+# CHANGE THIS to anything other than 'y' if you want to use your own redis installation
+#    if you do not install redis, make sure to set
+INSTALL_LOCAL_REDIS=y
+
 if [ ! -d "${INSTALL_DIR}" ]
 then
   mkdir -p "${INSTALL_DIR}"
@@ -22,6 +26,12 @@ cd $INSTALL_DIR || exit
 if systemctl is-active --quiet autoplex
 then
   systemctl stop autoplex.service
+fi
+
+# Stop the running service
+if systemctl is-active --quiet celery
+then
+  systemctl stop celery.service
 fi
 
 # Install or update dependencies
@@ -36,10 +46,24 @@ then
 fi
 
 # install postgresql if it's not installed
-if ! dpkge -s postgresql postgresql-contrib > /dev/null 2>&1
+if ! dpkg -s postgresql postgresql-contrib > /dev/null 2>&1
 then
   echo "Installing PostgreSQL"
   apt install -y postgresql postgresql-contrib
+fi
+
+# install redis if the var INSTALL_LOCAL_REDIS is set and it's not already installed
+if [ "${INSTALL_LOCAL_REDIS}" == "y" ]
+then
+  if ! dpkg -s redis > /dev/null 2>&1
+  then
+    apt install lsb-release curl gpg -y
+    curl -fsSL https://packages.redis.io/gpg | sudo gpg --dearmor -o /usr/share/keyrings/redis-archive-keyring.gpg
+    chmod 644 /usr/share/keyrings/redis-archive-keyring.gpg
+    echo "deb [signed-by=/usr/share/keyrings/redis-archive-keyring.gpg] https://packages.redis.io/deb $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/redis.list
+    apt update
+    apt install redis -y
+  fi
 fi
 
 if ! which uv
@@ -57,12 +81,6 @@ wget https://github.com/johnsturgeon/autoplex/archive/main.zip
 unzip main.zip
 rm main.zip
 
-# check to see if there is a database
-if [ -f "${DB_FILE}" ]
-then
-  cp "${DB_FILE}" autoplex-main/app/db/database.bak
-  cp "${DB_FILE}" autoplex-main/app/db
-fi
 rm -rf ${INSTALL_DIR}/app
 
 # grab the important bits
@@ -71,6 +89,7 @@ mv autoplex-main/pyproject.toml ${INSTALL_DIR}/app
 mv autoplex-main/.infisical.json ${INSTALL_DIR}/app
 mv autoplex-main/uv.lock ${INSTALL_DIR}/app
 mv autoplex-main/helpers/autoplex.service /etc/systemd/system
+mv autoplex-main/helpers/celery.service /etc/systemd/system
 rm -rf autoplex-main
 
 cd "${INSTALL_DIR}/app" || exit
@@ -89,17 +108,17 @@ then
   fi
   # Create the .env file
   infisical export --format=dotenv-export --env prod > .env
+else
+  echo "You need to make sure to create a .env"
+  echo "------- Please reference the ${INSTALL_DIR}/app/sample.env file -------- "
 fi
 
 # now use `uv` to create the environment
 uv sync
 
-if [ ! -f "${DB_FILE}" ]
-then
-  .venv/bin/python db/database.py
-fi
-
 systemctl daemon-reload
 systemctl enable autoplex.service
+systemctl enable celery.service
 systemctl start autoplex.service
+systemctl start celery.service
 
