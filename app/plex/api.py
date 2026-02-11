@@ -142,21 +142,3 @@ def get_track_list_from_plex_library(
     library = plex.library.sectionByID(library_id)
     all_tracks = library.searchTracks()
     return all_tracks
-
-
-def main():
-    library_list = get_library_list_from_plex(
-        auth_token=config.DEV_AUTH_TOKEN,
-        server_id=config.DEV_RESOURCE_ID,
-    )
-    for library in library_list:
-        print(library.TYPE)
-    track_list: List[Track] = get_track_list_from_plex_library(
-        config.DEV_AUTH_TOKEN, config.DEV_RESOURCE_ID, 12
-    )
-    for track in track_list:
-        print(track.key)
-
-
-if __name__ == "__main__":
-    main()
